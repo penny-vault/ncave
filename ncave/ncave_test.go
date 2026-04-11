@@ -11,7 +11,14 @@ import (
 	"github.com/penny-vault/pvbt/data"
 	"github.com/penny-vault/pvbt/engine"
 	"github.com/penny-vault/pvbt/portfolio"
+	"github.com/penny-vault/pvbt/universe"
 )
+
+var testTickers = []string{
+	"CCCC", "CSTE", "SEER", "XBIT", "ORMP",
+	"ACTG", "AMRX", "DIT", "FOSL", "LCUT",
+	"AAPL", "MSFT", "NVDA", "JPM",
+}
 
 var _ = Describe("NetCurrentAssetValue", func() {
 	var (
@@ -43,7 +50,10 @@ var _ = Describe("NetCurrentAssetValue", func() {
 	})
 
 	runBacktest := func() portfolio.Portfolio {
-		strategy := &ncave.NetCurrentAssetValue{}
+		strategy := &ncave.NetCurrentAssetValue{
+			Threshold: 1.5,
+			Universe:  universe.NewStatic(testTickers...),
+		}
 		acct := portfolio.New(
 			portfolio.WithCash(100000, startDate),
 			portfolio.WithAllMetrics(),
@@ -60,33 +70,85 @@ var _ = Describe("NetCurrentAssetValue", func() {
 		return result
 	}
 
-	It("rebalances only in June", func() {
+	It("produces expected returns and risk metrics", func() {
+		result := runBacktest()
+
+		summary, err := result.Summary()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(summary.TWRR).To(BeNumerically("~", -0.1911, 0.001))
+		Expect(summary.MaxDrawdown).To(BeNumerically("~", -0.4603, 0.001))
+		Expect(result.Value()).To(BeNumerically("~", 80894, 50))
+	})
+
+	It("rebalances only at end of June", func() {
 		result := runBacktest()
 		txns := result.Transactions()
 
-		rebalanceMonths := map[time.Month]bool{}
+		rebalanceDates := map[string]bool{}
 		for _, t := range txns {
 			if t.Type == asset.BuyTransaction || t.Type == asset.SellTransaction {
-				rebalanceMonths[t.Date.In(nyc).Month()] = true
+				d := t.Date.In(nyc)
+				Expect(d.Month()).To(Equal(time.June), "all trades should occur in June")
+				rebalanceDates[d.Format("2006-01-02")] = true
 			}
 		}
 
-		for m := range rebalanceMonths {
-			Expect(m).To(Equal(time.June), "all trades should occur in June")
+		Expect(rebalanceDates).To(HaveKey("2023-06-30"))
+		Expect(rebalanceDates).To(HaveKey("2025-06-30"))
+	})
+
+	It("selects the expected tickers on 2023-06-30 rebalance", func() {
+		result := runBacktest()
+
+		picks := map[string]bool{}
+		for _, t := range result.Transactions() {
+			if t.Type == asset.BuyTransaction &&
+				t.Date.In(nyc).Format("2006-01-02") == "2023-06-30" {
+				picks[t.Asset.Ticker] = true
+			}
+		}
+
+		expected := []string{"ACTG", "AMRX", "CCCC", "CSTE", "DIT", "FOSL", "LCUT", "ORMP", "SEER", "XBIT"}
+		Expect(picks).To(HaveLen(len(expected)))
+		for _, ticker := range expected {
+			Expect(picks).To(HaveKey(ticker), "expected %s in 2023-06-30 rebalance", ticker)
 		}
 	})
 
-	It("only buys stocks with positive NCAV/MV", func() {
+	It("drops stocks that no longer pass the threshold on 2025-06-30", func() {
 		result := runBacktest()
-		txns := result.Transactions()
 
-		buyCount := 0
-		for _, t := range txns {
-			if t.Type == asset.BuyTransaction {
-				buyCount++
+		picks := map[string]bool{}
+		for _, t := range result.Transactions() {
+			if t.Type == asset.BuyTransaction &&
+				t.Date.In(nyc).Format("2006-01-02") == "2025-06-30" {
+				picks[t.Asset.Ticker] = true
 			}
 		}
 
-		Expect(buyCount).To(BeNumerically(">=", 1), "should buy at least one stock")
+		// ACTG and AMRX no longer pass the threshold in Q1 2025.
+		expected := []string{"CCCC", "CSTE", "DIT", "FOSL", "LCUT", "ORMP", "SEER", "XBIT"}
+		Expect(picks).To(HaveLen(len(expected)))
+		for _, ticker := range expected {
+			Expect(picks).To(HaveKey(ticker), "expected %s in 2025-06-30 rebalance", ticker)
+		}
+	})
+
+	It("excludes financial-sector and high-cap non-value stocks", func() {
+		result := runBacktest()
+
+		excluded := map[string]bool{
+			"JPM":  true, // financial sector
+			"AAPL": true, // NCAV/MV too low
+			"MSFT": true, // NCAV/MV too low
+			"NVDA": true, // NCAV/MV too low
+		}
+
+		for _, t := range result.Transactions() {
+			if t.Type == asset.BuyTransaction {
+				Expect(excluded).NotTo(HaveKey(t.Asset.Ticker),
+					"%s should not have been purchased", t.Asset.Ticker)
+			}
+		}
 	})
 })

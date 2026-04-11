@@ -4,12 +4,14 @@ The Net Current Asset Value (NCAV) strategy is based on Benjamin Graham's approa
 
 ## Rules
 
-This strategy selects stocks whose net current asset value per share exceeds 1.5x their market capitalization per share. The portfolio is rebalanced annually in June.
+The investment universe is the US tradable stock universe -- liquid US common stocks with a market-cap floor and contiguous price history. Financial-sector stocks and companies with missing fundamental data are excluded. The portfolio is rebalanced at the end of June using Q1 fundamental data to ensure all filings are publicly available, then held from July.
 
-1. On the last trading day of June, compute the NCAV/MV ratio for all stocks in the index universe. NCAV/MV = Working Capital / Market Capitalization.
-2. Select all stocks with NCAV/MV greater than 1.5.
-3. Invest equally in all selected stocks.
-4. Hold the portfolio for one year until the next June rebalance.
+1. On the last trading day of June, fetch Q1 (March 31) working capital and market capitalization for the current US tradable universe, excluding financial-sector stocks.
+2. Drop stocks with missing or invalid fundamentals (NaN, non-positive market cap, or zero working capital).
+3. Compute NCAV/MV = Working Capital / Market Capitalization for each remaining stock.
+4. Select all stocks with NCAV/MV greater than the threshold (default: 1.5).
+5. Invest equally in all selected stocks.
+6. Hold the portfolio for one year until the next June rebalance.
 
 ## Assets Typically Held
 
