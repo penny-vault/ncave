@@ -5,7 +5,7 @@ go 1.25.6
 require (
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
-	github.com/penny-vault/pvbt v0.6.0
+	github.com/penny-vault/pvbt v0.7.0
 	github.com/rs/zerolog v1.34.0
 )
 
@@ -90,5 +90,3 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.46.1 // indirect
 )
-
-replace github.com/penny-vault/pvbt => ../../pvbt
