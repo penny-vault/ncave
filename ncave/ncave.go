@@ -39,10 +39,10 @@ var description string
 // stocks are excluded. The portfolio is rebalanced annually in July with equal
 // weighting, using Q1 fundamental data to ensure all filings are available.
 type NetCurrentAssetValue struct {
-	Threshold    float64           `pvbt:"threshold" desc:"Minimum NCAV/MV ratio to include a stock" default:"1.5"`
-	Universe     universe.Universe `pvbt:"universe" desc:"Comma-separated tickers to constrain the universe (default: us-tradable index)"`
-	MinHoldings       int    `pvbt:"min-holdings" desc:"Minimum number of stocks held each rebalance. When fewer stocks pass the screen, the remaining portfolio weight goes to the regime-change asset. Set to 0 to hold only the stocks that pass the screen." default:"30" suggest:"Classic=0|Diversified=30|Defensive=50"`
-	RegimeChangeAsset string `pvbt:"regime-change-asset" desc:"Ticker held when the screen finds fewer stocks than min-holdings. A sparse screen means value stocks are out of favor, so holding a growth-oriented index (such as QQQ) captures the prevailing market regime." default:"QQQ" suggest:"Classic=QQQ|Diversified=SPY|Defensive=IVW"`
+	Threshold         float64           `pvbt:"threshold" desc:"Minimum NCAV/MV ratio to include a stock" default:"1.5"`
+	Universe          universe.Universe `pvbt:"universe" desc:"Comma-separated tickers to constrain the universe (default: us-tradable index)"`
+	MinHoldings       int               `pvbt:"min-holdings" desc:"Minimum number of stocks held each rebalance. When fewer stocks pass the screen, the remaining portfolio weight goes to the regime-change asset. Set to 0 to hold only the stocks that pass the screen." default:"30" suggest:"Classic=0|Diversified=30|Defensive=50"`
+	RegimeChangeAsset string            `pvbt:"regime-change-asset" desc:"Ticker held when the screen finds fewer stocks than min-holdings. A sparse screen means value stocks are out of favor, so holding a growth-oriented index (such as QQQ) captures the prevailing market regime." default:"QQQ" suggest:"Classic=QQQ|Diversified=SPY|Defensive=IVW"`
 	regimeAsset       asset.Asset
 }
 
@@ -58,10 +58,12 @@ func (s *NetCurrentAssetValue) Setup(eng *engine.Engine) {
 		// to a full asset record (with composite_figi and sector) so FetchAt and
 		// sector filtering work correctly.
 		bare := s.Universe.Assets(time.Time{})
+
 		resolved := make([]asset.Asset, 0, len(bare))
 		for _, a := range bare {
 			resolved = append(resolved, eng.Asset(a.Ticker))
 		}
+
 		s.Universe = eng.Universe(resolved...)
 	}
 
@@ -98,6 +100,7 @@ func (s *NetCurrentAssetValue) Compute(ctx context.Context, eng *engine.Engine, 
 	allMembers := s.Universe.Assets(currentDate)
 
 	var nonFinancial []asset.Asset
+
 	for _, a := range allMembers {
 		if a.Sector != asset.SectorFinancialServices {
 			nonFinancial = append(nonFinancial, a)
