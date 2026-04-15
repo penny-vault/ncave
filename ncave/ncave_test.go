@@ -75,9 +75,9 @@ var _ = Describe("NetCurrentAssetValue", func() {
 
 		summary, err := result.Summary()
 		Expect(err).NotTo(HaveOccurred())
-		Expect(summary.TWRR).To(BeNumerically("~", -0.1911, 0.001))
-		Expect(summary.MaxDrawdown).To(BeNumerically("~", -0.4603, 0.001))
-		Expect(result.Value()).To(BeNumerically("~", 80894, 50))
+		Expect(summary.TWRR).To(BeNumerically("~", 0.4174, 0.001))
+		Expect(summary.MaxDrawdown).To(BeNumerically("~", -0.2263, 0.001))
+		Expect(result.Value()).To(BeNumerically("~", 141740, 50))
 	})
 
 	It("rebalances only at end of June", func() {
@@ -108,7 +108,9 @@ var _ = Describe("NetCurrentAssetValue", func() {
 			}
 		}
 
-		expected := []string{"ACTG", "AMRX", "CCCC", "CSTE", "DIT", "FOSL", "LCUT", "ORMP", "SEER", "XBIT"}
+		// 10 NCAV names pass the screen; the remaining 20 slots (out of the
+		// default min-holdings of 30) are filled by QQQ.
+		expected := []string{"ACTG", "AMRX", "CCCC", "CSTE", "DIT", "FOSL", "LCUT", "ORMP", "SEER", "XBIT", "QQQ"}
 		Expect(picks).To(HaveLen(len(expected)))
 		for _, ticker := range expected {
 			Expect(picks).To(HaveKey(ticker), "expected %s in 2023-06-30 rebalance", ticker)
