@@ -51,6 +51,8 @@ func (s *NetCurrentAssetValue) Name() string {
 }
 
 func (s *NetCurrentAssetValue) Setup(eng *engine.Engine) {
+	eng.SetFundamentalDimension("ARQ")
+
 	if s.Universe == nil {
 		s.Universe = eng.IndexUniverse("us-tradable")
 	} else {
@@ -76,7 +78,7 @@ func (s *NetCurrentAssetValue) Describe() engine.StrategyDescription {
 	return engine.StrategyDescription{
 		ShortCode:   "ncave",
 		Description: description,
-		Source:      "https://quantpedia.com/strategies/net-current-asset-value-effect/",
+		Source:      "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=966188",
 		Version:     "2.0.0",
 		VersionDate: time.Date(2026, 4, 14, 0, 0, 0, 0, time.UTC),
 		Schedule:    "@monthend",
@@ -85,7 +87,7 @@ func (s *NetCurrentAssetValue) Describe() engine.StrategyDescription {
 }
 
 func (s *NetCurrentAssetValue) Compute(ctx context.Context, eng *engine.Engine, _ portfolio.Portfolio, batch *portfolio.Batch) error {
-	// Rebalance at end of June (portfolio held from July per Quantpedia).
+	// Rebalance at end of June so the portfolio is held from July onward.
 	// Tradecron doesn't cleanly support "@monthend in month 6" as a single spec
 	// (combining @monthend with a Month cron field fires twice per June), so we
 	// use @monthend and filter for June here.
@@ -111,12 +113,24 @@ func (s *NetCurrentAssetValue) Compute(ctx context.Context, eng *engine.Engine, 
 		return nil
 	}
 
-	// Use Q1 (March 31) fundamental data so all filings are available by end of June.
-	q1Date := time.Date(currentDate.Year(), time.March, 31, 16, 0, 0, 0, currentDate.Location())
+	// Use prior-year fiscal year-end (Dec 31) fundamentals as of the March 31
+	// formation date: only 10-Ks filed by the first quarter-end count, so late
+	// filers are excluded. Market cap is sampled at the same formation date.
+	priorYearEnd := time.Date(currentDate.Year()-1, time.December, 31, 16, 0, 0, 0, currentDate.Location())
+	formation := time.Date(currentDate.Year(), time.March, 31, 16, 0, 0, 0, currentDate.Location())
 
-	fundDF, err := eng.FetchAt(ctx, nonFinancial, q1Date, []data.Metric{data.WorkingCapital, data.MarketCap})
+	fundDF, err := eng.FetchFundamentalsByDateKey(ctx, nonFinancial,
+		[]data.Metric{data.WorkingCapital, data.FundamentalsDateKey, data.FundamentalsReportPeriod},
+		priorYearEnd,
+		engine.WithAsOfDate(formation),
+	)
 	if err != nil {
 		return fmt.Errorf("fetch fundamentals: %w", err)
+	}
+
+	mcDF, err := eng.FetchAt(ctx, nonFinancial, formation, []data.Metric{data.MarketCap})
+	if err != nil {
+		return fmt.Errorf("fetch market cap: %w", err)
 	}
 
 	allAssets := fundDF.AssetList()
@@ -136,11 +150,19 @@ func (s *NetCurrentAssetValue) Compute(ctx context.Context, eng *engine.Engine, 
 
 	for _, stock := range allAssets {
 		wc := fundDF.Value(stock, data.WorkingCapital)
-		mc := fundDF.Value(stock, data.MarketCap)
+		mc := mcDF.Value(stock, data.MarketCap)
+		dk := fundDF.Value(stock, data.FundamentalsDateKey)
+		rp := fundDF.Value(stock, data.FundamentalsReportPeriod)
 
 		if math.IsNaN(wc) || math.IsNaN(mc) || mc <= 0 || wc == 0 {
 			continue
 		}
+
+		log.Info().
+			Str("ticker", stock.Ticker).
+			Time("date_key", time.Unix(int64(dk), 0)).
+			Time("report_period", time.Unix(int64(rp), 0)).
+			Msg("fundamental data")
 
 		ratio := wc / mc
 		if ratio <= s.Threshold {
