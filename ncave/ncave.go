@@ -82,7 +82,7 @@ func (s *NetCurrentAssetValue) Describe() engine.StrategyDescription {
 		Version:     "2.0.0",
 		VersionDate: time.Date(2026, 4, 14, 0, 0, 0, 0, time.UTC),
 		Schedule:    "@monthend",
-		Benchmark:   "VFINX",
+		Benchmark:   "SPY",
 	}
 }
 

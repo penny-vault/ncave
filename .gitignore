@@ -32,4 +32,5 @@ go.work.sum
 # .vscode/
 net-current-asset-value
 *.db
-!ncave/testdata/snapshot.db
+*.log
+ncave/testdata/
