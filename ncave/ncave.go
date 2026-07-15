@@ -79,8 +79,8 @@ func (s *NetCurrentAssetValue) Describe() engine.StrategyDescription {
 		ShortCode:   "ncave",
 		Description: description,
 		Source:      "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=966188",
-		Version:     "2.0.0",
-		VersionDate: time.Date(2026, 4, 14, 0, 0, 0, 0, time.UTC),
+		Version:     "2.0.1",
+		VersionDate: time.Date(2026, 7, 14, 0, 0, 0, 0, time.UTC),
 		Schedule:    "@monthend",
 		Benchmark:   "SPY",
 	}
